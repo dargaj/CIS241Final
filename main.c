@@ -17,7 +17,7 @@
 
 int countEntries=0;
 FILE *fp;
-int NUMBER_STRINGS=10000;
+int NUMBER_STRINGS=100000;
 int STRING_LENGTH=41;
 char hashes[100000][41];
 
@@ -68,8 +68,11 @@ char* hashone() {
 
     char *content =readFile(filename);
     if (strlen(content)>0) {
+
         fprintf(fp, "%s\n",filename);
-         fflush(fp);
+        fflush(fp);
+
+
         SHA1(result, content, strlen(content));
 
         for( offset = 0; offset < 20; offset++) {
@@ -90,15 +93,66 @@ char* hashone() {
 void hashfolder(){
     char result[21];
     static char hexresult[41];
-    char names[50];
+    char names[500];
     size_t offset;
 
     printf("Enter path to folder: ");
     scanf("%s", names);
 
     DIR *d;
-    DIR *a;
-    struct dirent *dir2;
+
+    struct dirent *dir;
+    d=opendir(names);
+    if (d) {
+        while((dir=readdir(d))!=NULL) {
+            if(dir->d_name[0]!='.')
+            {
+
+                char filename[500];
+                strcpy(filename,names);
+                strcat(filename,"/");
+                strcat(filename,dir->d_name);
+                char *store=&filename[(strlen(filename)-5)];
+                if (store[1]=='.'||store[0]=='.')
+                {
+                    printf("Hashing file: %s\n", filename);
+                    char *content =readFile(filename);
+                    if (strlen(content)>0) {
+                        SHA1(result, content, strlen(content));
+                        for( offset = 0; offset < 20; offset++) {
+                            sprintf( ( hexresult + (2*offset)), "%02x", result[offset]&0xff);
+                    }
+                    strcpy(hashes[countEntries], hexresult);
+                    countEntries++;
+                    if (countEntries<200)
+                    {
+                           fprintf(fp, "%s\n",filename);
+                           fflush(fp);
+                    }
+
+                }
+
+
+                }
+                else{
+                    hashfolder2(filename);
+                }
+            }
+        }
+        closedir(d);
+    }
+}
+
+/*
+    Get hashes for all files in a folder
+*/
+void hashfolder2(char *names){
+    char result[21];
+    static char hexresult[41];
+    size_t offset;
+
+    DIR *d;
+
     struct dirent *dir;
     d=opendir(names);
     if (d) {
@@ -122,10 +176,17 @@ void hashfolder(){
                     }
                     strcpy(hashes[countEntries], hexresult);
                     countEntries++;
-                    fprintf(fp, "%s\n",filename);
-                    fflush(fp);
+                    if (countEntries<200)
+                    {
+                        fprintf(fp, "%s\n",filename);
+                        fflush(fp);
+                    }
+
                 }
 
+                }
+                else{
+                    hashfolder2(filename);
                 }
             }
         }
@@ -304,7 +365,8 @@ void printElementsFile(struct node *node)
 {
     int i;
     int levelCount = height(node);
-    //int levelCount=2;
+    if (levelCount>6)
+        levelCount=6;
     for (i = 0; i < levelCount; i++)
     {
         printLevelFile(node, i);
@@ -387,6 +449,7 @@ int main()
     printElementsFile(rootNode);
     fclose(fp);
     userChoice=0;
+    printf("Number of files hashed: %d\n\n", countEntries);
     while (userChoice!=3)
     {
         printf("1) Print Hash Tree\n");
@@ -422,11 +485,11 @@ int main()
                     char *sub2;
                     printf("\n\nFile %s \n", filename);
 
-                    sub1=strstr(result2, "Final");
+                    sub1=strstr(result2, "Final hash");
                     printf("%.52s\n", sub1);
                     fflush(stdin);
                     printf("\nFile %s \n", filename2);
-                    sub2=strstr(result3, "Final");
+                    sub2=strstr(result3, "Final hash");
                     if(sub2[0]!='F')
                     {
                         printf("Invalid file format\n");
