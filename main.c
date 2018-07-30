@@ -14,6 +14,8 @@
 #include <assert.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <string.h>
+#include <sha1.h>
 
 int countEntries=0;
 FILE *fp;
@@ -60,7 +62,7 @@ char* hashone() {
 
     char result[21];
     static char hexresult[41];
-    char filename[50];
+    char filename[500];
     size_t offset;
 
     printf("Enter path to file with filename: ");
@@ -85,6 +87,57 @@ char* hashone() {
     }
     return "\n ";
 
+}
+
+/*
+    Get hashes for all files in a folder
+*/
+void hashfolder2(char *names){
+    char result[21];
+    static char hexresult[41];
+    size_t offset;
+
+    DIR *d;
+
+    struct dirent *dir;
+    d=opendir(names);
+    if (d) {
+        while((dir=readdir(d))!=NULL) {
+            if(dir->d_name[0]!='.')
+            {
+
+                char filename[500];
+                strcpy(filename,names);
+                strcat(filename,"/");
+                strcat(filename,dir->d_name);
+                char *store=&filename[(strlen(filename)-5)];
+                if (store[1]=='.'||store[0]=='.')
+                {
+                    printf("Hashing file: %s\n", filename);
+                    char *content =readFile(filename);
+                    if (strlen(content)>0) {
+                        SHA1(result, content, strlen(content));
+                        for( offset = 0; offset < 20; offset++) {
+                            sprintf( ( hexresult + (2*offset)), "%02x", result[offset]&0xff);
+                    }
+                    strcpy(hashes[countEntries], hexresult);
+                    countEntries++;
+                    if (countEntries<200)
+                    {
+                        fprintf(fp, "%s\n",filename);
+                        fflush(fp);
+                    }
+
+                }
+
+                }
+                else{
+                    hashfolder2(filename);
+                }
+            }
+        }
+        closedir(d);
+    }
 }
 
 /*
@@ -143,56 +196,7 @@ void hashfolder(){
     }
 }
 
-/*
-    Get hashes for all files in a folder
-*/
-void hashfolder2(char *names){
-    char result[21];
-    static char hexresult[41];
-    size_t offset;
 
-    DIR *d;
-
-    struct dirent *dir;
-    d=opendir(names);
-    if (d) {
-        while((dir=readdir(d))!=NULL) {
-            if(dir->d_name[0]!='.')
-            {
-
-                char filename[50];
-                strcpy(filename,names);
-                strcat(filename,"/");
-                strcat(filename,dir->d_name);
-                char *store=&filename[(strlen(filename)-5)];
-                if (store[1]=='.'||store[0]=='.')
-                {
-                    printf("Hashing file: %s\n", filename);
-                    char *content =readFile(filename);
-                    if (strlen(content)>0) {
-                        SHA1(result, content, strlen(content));
-                        for( offset = 0; offset < 20; offset++) {
-                            sprintf( ( hexresult + (2*offset)), "%02x", result[offset]&0xff);
-                    }
-                    strcpy(hashes[countEntries], hexresult);
-                    countEntries++;
-                    if (countEntries<200)
-                    {
-                        fprintf(fp, "%s\n",filename);
-                        fflush(fp);
-                    }
-
-                }
-
-                }
-                else{
-                    hashfolder2(filename);
-                }
-            }
-        }
-        closedir(d);
-    }
-}
 
 /*
     Given a string, create a hash
@@ -231,7 +235,6 @@ int hashTreeLevel(char hashesA[][41], int size, struct node *nextLevel[], int nu
     int counter=0;
     char *hexresult[41];
     int arraySize=0;
-    int oldSize=sizeof(nextLevel);
     if (size%2==0)
         arraySize=size/2+1;
     else
@@ -258,7 +261,7 @@ int hashTreeLevel(char hashesA[][41], int size, struct node *nextLevel[], int nu
     for (int i=0;i<size;i++) {
         if (i != size-1)
         {
-            char *result[STRING_LENGTH*2+1];
+            char result[STRING_LENGTH*2+1];
             strncpy(result, hashesA[i], strlen(hashesA[i])+1);
             strncat(result, hashesA[i+1], strlen(hashesA[i+1]));
             *hexresult=hashString(result);
@@ -305,6 +308,20 @@ int hashTreeLevel(char hashesA[][41], int size, struct node *nextLevel[], int nu
         }
     }
     return 1+hashTreeLevel(hashStore, num, level, size);
+}
+
+/* Compute the "height" of a tree
+*/
+int height(struct node* node)
+{
+    int lheight;
+    if (node==NULL)
+        return 0;
+    else
+    {
+        lheight = height(node->left);
+    }
+    return lheight+1;
 }
 
 /*
@@ -373,25 +390,12 @@ void printElementsFile(struct node *node)
         fprintf(fp,"\n");
     }
 }
-/* Compute the "height" of a tree
-*/
-int height(struct node* node)
-{
-    int lheight;
-    if (node==NULL)
-        return 0;
-    else
-    {
-        lheight = height(node->left);
-    }
-    return lheight+1;
-}
 
 int main()
 {
     char *hexresult[41];
-    char filename[50];
-    char filename2[50];
+    char filename[500];
+    char filename2[500];
     int userChoice;
 
     printf("Enter file name to save hash information to (ex hash.txt): ");
